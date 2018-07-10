@@ -3,6 +3,7 @@
  *  Licensed under the MIT License. See License.txt in the project root for license information.
  *--------------------------------------------------------------------------------------------*/
 
+const fs = require('fs');
 const gulp = require('gulp');
 const path = require('path');
 const azureStorage = require('azure-storage');
@@ -23,7 +24,7 @@ gulp.task('upload-vsix', (callback) => {
         const containerName = packageJson.name;
         const vsixName = `${packageJson.name}-${packageJson.version}.vsix`;
         const blobPath = path.join(process.env.TRAVIS_BRANCH, process.env.TRAVIS_BUILD_NUMBER, vsixName);
-        const storageName =process.env.STORAGE_NAME;
+        const storageName = process.env.STORAGE_NAME;
         const storageKey = process.env.STORAGE_KEY;
         if (!storageName || !storageKey) {
             console.log();
@@ -50,5 +51,14 @@ gulp.task('upload-vsix', (callback) => {
                 }
             });
         }
+    }
+});
+
+gulp.task('pretest', (callback) => {
+    // We need a folder to open vscode against while running tests.  Any additional temporary folders needed will be created within this folder (and hence workspace)
+    let rootFolder = process.cwd();
+    let testOutput = path.join(rootFolder, ".testoutput");
+    if (!fs.existsSync(testOutput)) {
+        fs.mkdirSync(testOutput);
     }
 });

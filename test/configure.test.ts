@@ -10,7 +10,7 @@ import * as vscode from 'vscode';
 import * as fse from 'fs-extra';
 import * as os from 'os';
 import * as path from 'path';
-import * as glob from 'glob';
+import * as process from 'process';
 import * as randomness from "../helpers/randomness";
 import { Platform } from "../configureWorkspace/config-utils";
 import { ext } from '../extensionVariables';
@@ -22,12 +22,13 @@ import { globAsync } from '../helpers/async';
 
 suite("configure (Add Docker files to Workspace)", function (this: ITestCallbackContext) {
     this.timeout(60 * 1000);
-
-    const testFolderPath: string = path.join(os.tmpdir(), `azure-docker.configureTests${randomness.getRandomHexString()}`);
+    let rootFolder = vscode.workspace.workspaceFolders[0].uri.fsPath;
+    const testFolderPath: string = path.join(rootFolder, `configureTests${randomness.getRandomHexString()}`);
     const outputChannel: vscode.OutputChannel = vscode.window.createOutputChannel('Docker extension tests');
     ext.outputChannel = outputChannel;
 
     suiteSetup(async function (this: IHookCallbackContext): Promise<void> {
+        console.log(`Test folder: ${testFolderPath}`);
         await fse.ensureDir(testFolderPath);
     });
 
@@ -70,22 +71,22 @@ suite("configure (Add Docker files to Workspace)", function (this: ITestCallback
 
         assertEx.unorderedArraysEqual(files, ['Dockerfile', 'docker-compose.debug.yml', 'docker-compose.yml'], "The set of files in the project folder after configure was run is not correct.");
 
-        assert.ok(fileContains('Dockerfile', 'EXPOSE 1234'));
-        assert.ok(fileContains('Dockerfile', 'CMD npm start'));
+        assert(fileContains('Dockerfile', 'EXPOSE 1234'));
+        assert(fileContains('Dockerfile', 'CMD npm start'));
 
-        assert.ok(fileContains('docker-compose.debug.yml', '1234:1234'));
-        assert.ok(fileContains('docker-compose.debug.yml', '9229:9229'));
-        assert.ok(fileContains('docker-compose.debug.yml', 'image: node.js no package.json'));
-        assert.ok(fileContains('docker-compose.debug.yml', 'NODE_ENV: development'));
-        assert.ok(fileContains('docker-compose.debug.yml', 'command: node --inspect index.js'));
+        assert(fileContains('docker-compose.debug.yml', '1234:1234'));
+        assert(fileContains('docker-compose.debug.yml', '9229:9229'));
+        assert(fileContains('docker-compose.debug.yml', 'image: node.js no package.json'));
+        assert(fileContains('docker-compose.debug.yml', 'NODE_ENV: development'));
+        assert(fileContains('docker-compose.debug.yml', 'command: node --inspect index.js'));
 
-        assert.ok(fileContains('docker-compose.yml', '1234:1234'));
-        assert.ok(!fileContains('docker-compose.yml', '9229:9229'));
-        assert.ok(fileContains('docker-compose.yml', 'image: node.js no package.json'));
-        assert.ok(fileContains('docker-compose.yml', 'NODE_ENV: production'));
-        assert.ok(!fileContains('docker-compose.yml', 'command: node --inspect index.js'));
+        assert(fileContains('docker-compose.yml', '1234:1234'));
+        assert(!fileContains('docker-compose.yml', '9229:9229'));
+        assert(fileContains('docker-compose.yml', 'image: node.js no package.json'));
+        assert(fileContains('docker-compose.yml', 'NODE_ENV: production'));
+        assert(!fileContains('docker-compose.yml', 'command: node --inspect index.js'));
 
-        assert.ok(fileContains('.dockerignore', '.vscode'));
+        assert(fileContains('.dockerignore', '.vscode'));
     });
 
     testInFolder("Node.js with start script", async () => {
@@ -103,29 +104,28 @@ suite("configure (Add Docker files to Workspace)", function (this: ITestCallback
                 "dependencies": {
                   "azure-arm-containerregistry": "^1.0.0-preview"
                 }
-              }
             }
             `);
 
         await testConfigureDocker(projectFolderPath, 'Node.js', '4321');
         let files = await globAsync('**/*', { cwd: projectFolderPath });
 
-        assert.ok(fileContains('Dockerfile', 'EXPOSE 4321'));
-        assert.ok(fileContains('Dockerfile', 'CMD npm start'));
+        assert(fileContains('Dockerfile', 'EXPOSE 4321'));
+        assert(fileContains('Dockerfile', 'CMD npm start'));
 
-        assert.ok(fileContains('docker-compose.debug.yml', '4321:4321'));
-        assert.ok(fileContains('docker-compose.debug.yml', '9229:9229'));
-        assert.ok(fileContains('docker-compose.debug.yml', 'image: node.js with start script'));
-        assert.ok(fileContains('docker-compose.debug.yml', 'NODE_ENV: development'));
-        assert.ok(fileContains('docker-compose.debug.yml', 'command: node --inspect index.js'));
+        assert(fileContains('docker-compose.debug.yml', '4321:4321'));
+        assert(fileContains('docker-compose.debug.yml', '9229:9229'));
+        assert(fileContains('docker-compose.debug.yml', 'image: node.js with start script'));
+        assert(fileContains('docker-compose.debug.yml', 'NODE_ENV: development'));
+        assert(fileContains('docker-compose.debug.yml', 'command: node --inspect index.js'));
 
-        assert.ok(fileContains('docker-compose.yml', '4321:4321'));
-        assert.ok(!fileContains('docker-compose.yml', '9229:9229'));
-        assert.ok(fileContains('docker-compose.yml', 'image: node.js with start script'));
-        assert.ok(fileContains('docker-compose.yml', 'NODE_ENV: production'));
-        assert.ok(!fileContains('docker-compose.yml', 'command: node --inspect index.js'));
+        assert(fileContains('docker-compose.yml', '4321:4321'));
+        assert(!fileContains('docker-compose.yml', '9229:9229'));
+        assert(fileContains('docker-compose.yml', 'image: node.js with start script'));
+        assert(fileContains('docker-compose.yml', 'NODE_ENV: production'));
+        assert(!fileContains('docker-compose.yml', 'command: node --inspect index.js'));
 
-        assert.ok(fileContains('.dockerignore', '.vscode'));
+        assert(fileContains('.dockerignore', '.vscode'));
     });
 
     testInFolder("Node.js without start script", async () => {
@@ -142,19 +142,13 @@ suite("configure (Add Docker files to Workspace)", function (this: ITestCallback
                 "dependencies": {
                   "azure-arm-containerregistry": "^1.0.0-preview"
                 }
-              }
             }
             `);
 
         await testConfigureDocker(projectFolderPath, 'Node.js', '4321');
         let files = await globAsync('**/*', { cwd: projectFolderPath });
 
-        assert.ok(fileContains('Dockerfile', 'EXPOSE 4321'));
-        assert.ok(!fileContains('Dockerfile', 'CMD npm start'));
-
-        assert.ok(fileContains('docker-compose.debug.yml', 'NODE_ENV: development'));
-        assert.ok(fileContains('docker-compose.debug.yml', 'command: node --inspect index.js'));
-
-        assert.ok(!fileContains('docker-compose.yml', 'command: node --inspect index.js'));
+        assert(fileContains('Dockerfile', 'EXPOSE 4321'));
+        assert(fileContains('Dockerfile', 'CMD node ./out/dockerExtension'));
     });
 });
