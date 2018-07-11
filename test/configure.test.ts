@@ -8,14 +8,12 @@ import * as assert from 'assert';
 import * as assertEx from './assertEx';
 import * as vscode from 'vscode';
 import * as fse from 'fs-extra';
-import * as os from 'os';
 import * as path from 'path';
 import { Platform } from "../configureWorkspace/config-utils";
 import { ext } from '../extensionVariables';
-import { ITestCallbackContext, IHookCallbackContext } from 'mocha';
+import { ITestCallbackContext } from 'mocha';
 import { configure } from '../configureWorkspace/configure';
 import { TestUserInput } from 'vscode-azureextensionui';
-import { resolve } from 'dns';
 import { globAsync } from '../helpers/async';
 
 suite("configure (Add Docker files to Workspace)", function (this: ITestCallbackContext) {
@@ -128,7 +126,7 @@ suite("configure (Add Docker files to Workspace)", function (this: ITestCallback
         });
 
         testInEmptyFolder("Without start script", async () => {
-            await writeFile('subfolder', 'package.json',
+            await writeFile('', 'package.json',
                 `{
                 "name": "vscode-docker",
                 "version": "0.0.28",
@@ -147,7 +145,7 @@ suite("configure (Add Docker files to Workspace)", function (this: ITestCallback
             await testConfigureDocker('Node.js', '4321');
 
             let projectFiles = await getProjectFiles();
-            assertEx.unorderedArraysEqual(projectFiles, ['subfolder/package.json', 'Dockerfile', 'docker-compose.debug.yml', 'docker-compose.yml', '.dockerignore'], "The set of files in the project folder after configure was run is not correct.");
+            assertEx.unorderedArraysEqual(projectFiles, ['package.json', 'Dockerfile', 'docker-compose.debug.yml', 'docker-compose.yml', '.dockerignore'], "The set of files in the project folder after configure was run is not correct.");
 
             assert(fileContains('Dockerfile', 'EXPOSE 4321'));
             assert(fileContains('Dockerfile', 'CMD node ./out/dockerExtension'));
@@ -155,13 +153,12 @@ suite("configure (Add Docker files to Workspace)", function (this: ITestCallback
     });
 
     suite("ASP.NET Core", () => {
-        testInEmptyFolder("ASP.NET Core no project file", async () => {
-            await testConfigureDocker('ASP.NET Core', 'Windows', '1234');
-            let files = await getProjectFiles();
-
-            assert(fileContains('Dockerfile', 'EXPOSE 4321'));
-            assert(fileContains('Dockerfile', 'CMD node ./out/dockerExtension'));
-        });
+        // https://github.com/Microsoft/vscode-docker/issues/295
+        // testInEmptyFolder("ASP.NET Core no project file", async () => {
+        //     await assertEx.throwsOrRejectsAsync(async () => testConfigureDocker('ASP.NET Core', 'Windows', '1234'),
+        //         { message: "No .csproj file could be found." }
+        //     );
+        // });
 
         testInEmptyFolder("ASP.NET Core with project file, Windows", async () => {
             // https://github.com/dotnet/dotnet-docker/tree/master/samples/aspnetapp
@@ -190,11 +187,12 @@ suite("configure (Add Docker files to Workspace)", function (this: ITestCallback
             assert(fileContains('Dockerfile', 'EXPOSE 1234'));
             assert(fileContains('DockerFile', 'RUN dotnet build projectFolder/aspnetapp.csproj -c Release -o /app'));
             assert(fileContains('Dockerfile', 'ENTRYPOINT \\["dotnet", "projectFolder/aspnetapp.dll"\\]'));
+            assert(fileContains('Dockerfile', 'FROM microsoft/aspnetcore-build:2.0-nanoserver-1709 AS build'));
         });
 
         testInEmptyFolder("ASP.NET Core with project file, Linux", async () => {
             // https://github.com/dotnet/dotnet-docker/tree/master/samples/aspnetapp
-            await writeFile('projectFolder', 'aspnetapp.csproj', `
+            await writeFile('projectFolder2', 'aspnetapp2.csproj', `
                 <Project Sdk="Microsoft.NET.Sdk.Web">
 
                 <PropertyGroup>
@@ -214,11 +212,12 @@ suite("configure (Add Docker files to Workspace)", function (this: ITestCallback
             let projectFiles = await getProjectFiles();
 
             // No docker-compose files
-            assertEx.unorderedArraysEqual(projectFiles, ['Dockerfile', '.dockerignore', 'projectFolder/aspnetapp.csproj'], "The set of files in the project folder after configure was run is not correct.");
+            assertEx.unorderedArraysEqual(projectFiles, ['Dockerfile', '.dockerignore', 'projectFolder2/aspnetapp2.csproj'], "The set of files in the project folder after configure was run is not correct.");
 
             assert(fileContains('Dockerfile', 'EXPOSE 1234'));
-            assert(fileContains('DockerFile', 'RUN dotnet build projectFolder/aspnetapp.csproj -c Release -o /app'));
-            assert(fileContains('Dockerfile', 'ENTRYPOINT \\["dotnet", "projectFolder/aspnetapp.dll"\\]'));
+            assert(fileContains('DockerFile', 'RUN dotnet build projectFolder2/aspnetapp2.csproj -c Release -o /app'));
+            assert(fileContains('Dockerfile', 'ENTRYPOINT \\["dotnet", "projectFolder2/aspnetapp2.dll"\\]'));
+            assert(fileContains('Dockerfile', 'FROM microsoft/aspnetcore-build:2.0 AS build'));
         });
     });
 });

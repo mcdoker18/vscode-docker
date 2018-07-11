@@ -27,12 +27,16 @@
 				"--extensionDevelopmentPath=${workspaceRoot}",
 				"--extensionTestsPath=${workspaceRoot}/out/test"
 			],
+			"env": {
+				"NO_TIMEOUTS": "1",
+				"DEBUG": "mocha:suite"
+			},
 			"stopOnEntry": false,
 			"sourceMaps": true,
 			"outFiles": [
 				"${workspaceRoot}/out/test"
 			],
-			"preLaunchTask": "gulp: pretest"
+			"preLaunchTask": "gulp: pretest",
 		}
 	]
 }

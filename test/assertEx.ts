@@ -1,4 +1,5 @@
 import * as assert from 'assert';
+import { parseError } from 'vscode-azureextensionui';
 
 export function isTrue<T>(f: boolean, message?: string): void {
     assert.ok(f === true, message);
@@ -43,6 +44,22 @@ export function notUnorderedArraysEqual<T>(array1: T[], array2: T[], message?: s
     isFalse(areUnorderedArraysEqual(array1, array2), message);
 }
 
+export async function throwsOrRejectsAsync(block: () => Promise<any>, expected: {}, message?: string): Promise<void> {
+    let error: any;
+    try {
+        await block();
+    } catch (err) {
+        error = err;
+    }
+
+    if (!error) {
+        throw new Error(`Expected exception or rejection: ${parseError(expected).message}`);
+    }
+    for (let prop of Object.getOwnPropertyNames(expected)) {
+        assert.equal(error[prop], expected[prop], `Error did not have the expected value for property '${prop}'`);
+    }
+}
+
 suite("assertEx", () => {
     test("areUnorderedArraysEqual", () => {
         isTrue(areUnorderedArraysEqual([], []));
@@ -52,5 +69,61 @@ suite("assertEx", () => {
         isTrue(areUnorderedArraysEqual([1, 2], [1, 2]));
         isTrue(areUnorderedArraysEqual([1, 2], [2, 1]));
         isFalse(areUnorderedArraysEqual([1, 2], [2, 1, 3]));
+    });
+
+    suite("throwsAsync", () => {
+        test("throws", async () => {
+            await throwsOrRejectsAsync(async () => {
+                throw new Error("this is an error");
+            },
+                {
+                    message: "this is an error"
+                }
+            );
+        });
+
+        test("rejects", async () => {
+            await throwsOrRejectsAsync((): Promise<void> => {
+                return Promise.reject(new Error("This is a rejection. Don't take it personally."));
+            },
+                {
+                    message: "This is a rejection. Don't take it personally."
+                }
+            );
+        });
+
+        test("wrong message", async () => {
+            let error: any;
+            try {
+                await throwsOrRejectsAsync((): Promise<void> => {
+                    throw new Error("this is an error");
+                },
+                    {
+                        message: "I'm expecting too much"
+                    }
+                );
+            } catch (err) {
+                error = err;
+            }
+
+            assert.equal(error && error.message, "Error did not have the expected value for property 'message'");
+        });
+
+        test("fails", async () => {
+            let error: any;
+            try {
+                await throwsOrRejectsAsync((): Promise<void> => {
+                    return Promise.resolve();
+                },
+                    {
+                        message: "This is a rejection. Don't take it personally."
+                    }
+                );
+            } catch (err) {
+                error = err;
+            }
+
+            assert.equal(error && error.message, "Expected exception or rejection: This is a rejection. Don't take it personally.");
+        })
     });
 });

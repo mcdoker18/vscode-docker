@@ -490,6 +490,7 @@ async function readPomOrGradle(folderPath: string): Promise<PackageJson> {
     return pkg;
 }
 
+// Returns the relative path of the project file without the extension
 async function findCSProjFile(folderPath: string): Promise<string> {
     const opt: vscode.QuickPickOptions = {
         matchOnDescription: true,
