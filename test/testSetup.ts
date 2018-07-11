@@ -1,5 +1,4 @@
 import * as vscode from "vscode";
-import * as path from "path";
 
 export function testSetup(): void {
     let workspaceFolders = vscode.workspace.workspaceFolders;
@@ -10,7 +9,8 @@ export function testSetup(): void {
         throw new Error("There are unexpected multiple workspaces open");
     }
 
-    if (path.dirname(workspaceFolders[0].uri.fsPath) !== '.testoutput') {
+    // Don't want to accidentally delete a random folder
+    if (workspaceFolders[0].name !== '.testoutput') {
         throw new Error("vscode is opened against the wrong folder for tests");
     }
 }

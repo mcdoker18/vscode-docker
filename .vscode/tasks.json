@@ -20,8 +20,8 @@
 			"task": "pretest",
 			"problemMatcher": [],
 			"presentation": {
-				"echo": true,
-				"reveal": "silent",
+				"echo": false,
+				"reveal": "never",
 				"focus": false,
 				"panel": "shared",
 				"showReuseMessage": true

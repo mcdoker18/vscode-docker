@@ -10,8 +10,6 @@ import * as vscode from 'vscode';
 import * as fse from 'fs-extra';
 import * as os from 'os';
 import * as path from 'path';
-import * as process from 'process';
-import * as randomness from "../helpers/randomness";
 import { Platform } from "../configureWorkspace/config-utils";
 import { ext } from '../extensionVariables';
 import { ITestCallbackContext, IHookCallbackContext } from 'mocha';
@@ -37,8 +35,9 @@ suite("configure (Add Docker files to Workspace)", function (this: ITestCallback
         assert.equal(inputs.length, 0, 'Not all inputs were used.');
     }
 
-    async function writeFile(fileName: string, text: string): Promise<void> {
-        await fse.writeFile(path.join(rootFolder, 'package.json'), text);
+    async function writeFile(subfolderName: string, fileName: string, text: string): Promise<void> {
+        await fse.ensureDir(path.join(rootFolder, subfolderName));
+        await fse.writeFile(path.join(rootFolder, subfolderName, fileName), text);
     }
 
     function fileContains(fileName: string, text: string): boolean {
@@ -47,43 +46,49 @@ suite("configure (Add Docker files to Workspace)", function (this: ITestCallback
     }
 
     async function getProjectFiles(): Promise<string[]> {
-        return await globAsync('**/*', { cwd: rootFolder });
+        return await globAsync('**/*', {
+            cwd: rootFolder,
+            dot: true, // include files beginning with dot
+            nodir: true
+        });
     }
 
-    function testInFolder(name: string, func: () => Promise<void>): void {
+    function testInEmptyFolder(name: string, func: () => Promise<void>): void {
         test(name, async () => {
+            // Delete everything in the root testing folder
             await fse.emptyDir(rootFolder);
             await func();
         });
     }
 
-    testInFolder("Node.js no package.json", async () => {
-        await testConfigureDocker('Node.js', '1234');
-        let projectFiles = await getProjectFiles();
+    suite("Node.js", () => {
+        testInEmptyFolder("No package.json", async () => {
+            await testConfigureDocker('Node.js', '1234');
 
-        assertEx.unorderedArraysEqual(projectFiles, ['Dockerfile', 'docker-compose.debug.yml', 'docker-compose.yml'], "The set of files in the project folder after configure was run is not correct.");
+            let projectFiles = await getProjectFiles();
+            assertEx.unorderedArraysEqual(projectFiles, ['Dockerfile', 'docker-compose.debug.yml', 'docker-compose.yml', '.dockerignore'], "The set of files in the project folder after configure was run is not correct.");
 
-        assert(fileContains('Dockerfile', 'EXPOSE 1234'));
-        assert(fileContains('Dockerfile', 'CMD npm start'));
+            assert(fileContains('Dockerfile', 'EXPOSE 1234'));
+            assert(fileContains('Dockerfile', 'CMD npm start'));
 
-        assert(fileContains('docker-compose.debug.yml', '1234:1234'));
-        assert(fileContains('docker-compose.debug.yml', '9229:9229'));
-        assert(fileContains('docker-compose.debug.yml', 'image: node.js no package.json'));
-        assert(fileContains('docker-compose.debug.yml', 'NODE_ENV: development'));
-        assert(fileContains('docker-compose.debug.yml', 'command: node --inspect index.js'));
+            assert(fileContains('docker-compose.debug.yml', '1234:1234'));
+            assert(fileContains('docker-compose.debug.yml', '9229:9229'));
+            assert(fileContains('docker-compose.debug.yml', 'image: .testoutput'));
+            assert(fileContains('docker-compose.debug.yml', 'NODE_ENV: development'));
+            assert(fileContains('docker-compose.debug.yml', 'command: node --inspect index.js'));
 
-        assert(fileContains('docker-compose.yml', '1234:1234'));
-        assert(!fileContains('docker-compose.yml', '9229:9229'));
-        assert(fileContains('docker-compose.yml', 'image: node.js no package.json'));
-        assert(fileContains('docker-compose.yml', 'NODE_ENV: production'));
-        assert(!fileContains('docker-compose.yml', 'command: node --inspect index.js'));
+            assert(fileContains('docker-compose.yml', '1234:1234'));
+            assert(!fileContains('docker-compose.yml', '9229:9229'));
+            assert(fileContains('docker-compose.yml', 'image: .testoutput'));
+            assert(fileContains('docker-compose.yml', 'NODE_ENV: production'));
+            assert(!fileContains('docker-compose.yml', 'command: node --inspect index.js'));
 
-        assert(fileContains('.dockerignore', '.vscode'));
-    });
+            assert(fileContains('.dockerignore', '.vscode'));
+        });
 
-    testInFolder("Node.js with start script", async () => {
-        await writeFile('package.json',
-            `{
+        testInEmptyFolder("With start script", async () => {
+            await writeFile('', 'package.json',
+                `{
                 "name": "vscode-docker",
                 "version": "0.0.28",
                 "main": "./out/dockerExtension",
@@ -99,30 +104,32 @@ suite("configure (Add Docker files to Workspace)", function (this: ITestCallback
             }
             `);
 
-        await testConfigureDocker('Node.js', '4321');
-        let files = await getProjectFiles();
+            await testConfigureDocker('Node.js', '4321');
 
-        assert(fileContains('Dockerfile', 'EXPOSE 4321'));
-        assert(fileContains('Dockerfile', 'CMD npm start'));
+            let projectFiles = await getProjectFiles();
+            assertEx.unorderedArraysEqual(projectFiles, ['package.json', 'Dockerfile', 'docker-compose.debug.yml', 'docker-compose.yml', '.dockerignore'], "The set of files in the project folder after configure was run is not correct.");
 
-        assert(fileContains('docker-compose.debug.yml', '4321:4321'));
-        assert(fileContains('docker-compose.debug.yml', '9229:9229'));
-        assert(fileContains('docker-compose.debug.yml', 'image: node.js with start script'));
-        assert(fileContains('docker-compose.debug.yml', 'NODE_ENV: development'));
-        assert(fileContains('docker-compose.debug.yml', 'command: node --inspect index.js'));
+            assert(fileContains('Dockerfile', 'EXPOSE 4321'));
+            assert(fileContains('Dockerfile', 'CMD npm start'));
 
-        assert(fileContains('docker-compose.yml', '4321:4321'));
-        assert(!fileContains('docker-compose.yml', '9229:9229'));
-        assert(fileContains('docker-compose.yml', 'image: node.js with start script'));
-        assert(fileContains('docker-compose.yml', 'NODE_ENV: production'));
-        assert(!fileContains('docker-compose.yml', 'command: node --inspect index.js'));
+            assert(fileContains('docker-compose.debug.yml', '4321:4321'));
+            assert(fileContains('docker-compose.debug.yml', '9229:9229'));
+            assert(fileContains('docker-compose.debug.yml', 'image: .testoutput'));
+            assert(fileContains('docker-compose.debug.yml', 'NODE_ENV: development'));
+            assert(fileContains('docker-compose.debug.yml', 'command: node --inspect index.js'));
 
-        assert(fileContains('.dockerignore', '.vscode'));
-    });
+            assert(fileContains('docker-compose.yml', '4321:4321'));
+            assert(!fileContains('docker-compose.yml', '9229:9229'));
+            assert(fileContains('docker-compose.yml', 'image: .testoutput'));
+            assert(fileContains('docker-compose.yml', 'NODE_ENV: production'));
+            assert(!fileContains('docker-compose.yml', 'command: node --inspect index.js'));
 
-    testInFolder("Node.js without start script", async () => {
-        await writeFile('package.json',
-            `{
+            assert(fileContains('.dockerignore', '.vscode'));
+        });
+
+        testInEmptyFolder("Without start script", async () => {
+            await writeFile('subfolder', 'package.json',
+                `{
                 "name": "vscode-docker",
                 "version": "0.0.28",
                 "main": "./out/dockerExtension",
@@ -137,35 +144,81 @@ suite("configure (Add Docker files to Workspace)", function (this: ITestCallback
             }
             `);
 
-        await testConfigureDocker('Node.js', '4321');
-        let files = await getProjectFiles();
+            await testConfigureDocker('Node.js', '4321');
 
-        assert(fileContains('Dockerfile', 'EXPOSE 4321'));
-        assert(fileContains('Dockerfile', 'CMD node ./out/dockerExtension'));
+            let projectFiles = await getProjectFiles();
+            assertEx.unorderedArraysEqual(projectFiles, ['subfolder/package.json', 'Dockerfile', 'docker-compose.debug.yml', 'docker-compose.yml', '.dockerignore'], "The set of files in the project folder after configure was run is not correct.");
+
+            assert(fileContains('Dockerfile', 'EXPOSE 4321'));
+            assert(fileContains('Dockerfile', 'CMD node ./out/dockerExtension'));
+        });
     });
 
-    testInFolder("ASP.NET Core empty folder", async () => {
-        await writeFile('package.json',
-            `{
-                "name": "vscode-docker",
-                "version": "0.0.28",
-                "main": "./out/dockerExtension",
-                "author": "Azure",
-                "scripts": {
-                  "vscode:prepublish": "tsc -p ./",
-                  "test": "npm run build && node ./node_modules/vscode/bin/test"
-                },
-                "dependencies": {
-                  "azure-arm-containerregistry": "^1.0.0-preview"
-                }
-            }
+    suite("ASP.NET Core", () => {
+        testInEmptyFolder("ASP.NET Core no project file", async () => {
+            await testConfigureDocker('ASP.NET Core', 'Windows', '1234');
+            let files = await getProjectFiles();
+
+            assert(fileContains('Dockerfile', 'EXPOSE 4321'));
+            assert(fileContains('Dockerfile', 'CMD node ./out/dockerExtension'));
+        });
+
+        testInEmptyFolder("ASP.NET Core with project file, Windows", async () => {
+            // https://github.com/dotnet/dotnet-docker/tree/master/samples/aspnetapp
+            await writeFile('projectFolder', 'aspnetapp.csproj', `
+                <Project Sdk="Microsoft.NET.Sdk.Web">
+
+                <PropertyGroup>
+                    <TargetFramework>netcoreapp2.1</TargetFramework>
+                    <UserSecretsId>31051026529000467138</UserSecretsId>
+                </PropertyGroup>
+
+                <ItemGroup>
+                    <PackageReference Include="Microsoft.AspNetCore.App" />
+                </ItemGroup>
+
+                </Project>
             `);
 
-        await testConfigureDocker('ASP.NET Core', '1234');
-        let files = await getProjectFiles();
+            await testConfigureDocker('ASP.NET Core', 'Windows', '1234');
 
-        assert(fileContains('Dockerfile', 'EXPOSE 4321'));
-        assert(fileContains('Dockerfile', 'CMD node ./out/dockerExtension'));
+            let projectFiles = await getProjectFiles();
+
+            // No docker-compose files
+            assertEx.unorderedArraysEqual(projectFiles, ['Dockerfile', '.dockerignore', 'projectFolder/aspnetapp.csproj'], "The set of files in the project folder after configure was run is not correct.");
+
+            assert(fileContains('Dockerfile', 'EXPOSE 1234'));
+            assert(fileContains('DockerFile', 'RUN dotnet build projectFolder/aspnetapp.csproj -c Release -o /app'));
+            assert(fileContains('Dockerfile', 'ENTRYPOINT \\["dotnet", "projectFolder/aspnetapp.dll"\\]'));
+        });
+
+        testInEmptyFolder("ASP.NET Core with project file, Linux", async () => {
+            // https://github.com/dotnet/dotnet-docker/tree/master/samples/aspnetapp
+            await writeFile('projectFolder', 'aspnetapp.csproj', `
+                <Project Sdk="Microsoft.NET.Sdk.Web">
+
+                <PropertyGroup>
+                    <TargetFramework>netcoreapp2.1</TargetFramework>
+                    <UserSecretsId>31051026529000467138</UserSecretsId>
+                </PropertyGroup>
+
+                <ItemGroup>
+                    <PackageReference Include="Microsoft.AspNetCore.App" />
+                </ItemGroup>
+
+                </Project>
+            `);
+
+            await testConfigureDocker('ASP.NET Core', 'Linux', '1234');
+
+            let projectFiles = await getProjectFiles();
+
+            // No docker-compose files
+            assertEx.unorderedArraysEqual(projectFiles, ['Dockerfile', '.dockerignore', 'projectFolder/aspnetapp.csproj'], "The set of files in the project folder after configure was run is not correct.");
+
+            assert(fileContains('Dockerfile', 'EXPOSE 1234'));
+            assert(fileContains('DockerFile', 'RUN dotnet build projectFolder/aspnetapp.csproj -c Release -o /app'));
+            assert(fileContains('Dockerfile', 'ENTRYPOINT \\["dotnet", "projectFolder/aspnetapp.dll"\\]'));
+        });
     });
-
 });

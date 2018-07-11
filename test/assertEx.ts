@@ -35,8 +35,8 @@ function areUnorderedArraysEqual<T>(array1: T[], array2: T[]): boolean {
     return true;
 }
 
-export function unorderedArraysEqual<T>(array1: T[], array2: T[], message?: string): void {
-    isTrue(areUnorderedArraysEqual(array1, array2), message);
+export function unorderedArraysEqual<T>(actual: T[], expected: T[], message?: string): void {
+    isTrue(areUnorderedArraysEqual(actual, expected), `${message}\n  Actual: ${JSON.stringify(actual)}\n  Expected: ${JSON.stringify(expected)}`);
 }
 
 export function notUnorderedArraysEqual<T>(array1: T[], array2: T[], message?: string): void {
