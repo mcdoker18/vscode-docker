@@ -69,7 +69,7 @@ suite("assertEx", () => {
         unorderedArraysEqual([], []);
         notUnorderedArraysEqual([], [1]);
         unorderedArraysEqual([1], [1]);
-        unorderedArraysEqual([1], [1, 2]);
+        notUnorderedArraysEqual([1], [1, 2]);
         unorderedArraysEqual([1, 2], [1, 2]);
         unorderedArraysEqual([1, 2], [2, 1]);
         notUnorderedArraysEqual([1, 2], [2, 1, 3]);
