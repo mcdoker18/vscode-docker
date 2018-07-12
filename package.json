@@ -615,7 +615,7 @@
     "lint-fix": "tslint --project tsconfig.json -t verbose --fix",
     "postinstall": "node ./node_modules/vscode/bin/install",
     "pretest": "gulp pretest",
-    "test": "npm run build && npm run pretest && node ./node_modules/vscode/bin/test ./testoutput",
+    "test": "npm run build && npm run pretest && node ./node_modules/vscode/bin/test -- ./testoutput",
     "all": "npm i && npm run lint && npm test"
   },
   "extensionDependencies": [

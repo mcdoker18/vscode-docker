@@ -15,10 +15,13 @@ import { Suite } from 'mocha';
 import { configure } from '../configureWorkspace/configure';
 import { TestUserInput } from 'vscode-azureextensionui';
 import { globAsync } from '../helpers/async';
+import { getTestRootFolder, constants } from './global.test';
+
+let testRootFolder: string = getTestRootFolder();
 
 suite("configure (Add Docker files to Workspace)", function (this: Suite): void {
     this.timeout(60 * 1000);
-    let rootFolder = vscode.workspace.workspaceFolders[0].uri.fsPath;
+
     const outputChannel: vscode.OutputChannel = vscode.window.createOutputChannel('Docker extension tests');
     ext.outputChannel = outputChannel;
 
@@ -28,17 +31,17 @@ suite("configure (Add Docker files to Workspace)", function (this: Suite): void 
         const ui: TestUserInput = new TestUserInput(inputs);
         ext.ui = ui;
 
-        await configure(rootFolder);
+        await configure(testRootFolder);
         assert.equal(inputs.length, 0, 'Not all inputs were used.');
     }
 
     async function writeFile(subfolderName: string, fileName: string, text: string): Promise<void> {
-        await fse.ensureDir(path.join(rootFolder, subfolderName));
-        await fse.writeFile(path.join(rootFolder, subfolderName, fileName), text);
+        await fse.ensureDir(path.join(testRootFolder, subfolderName));
+        await fse.writeFile(path.join(testRootFolder, subfolderName, fileName), text);
     }
 
     function fileContains(fileName: string, text: string): boolean {
-        let contents = fse.readFileSync(path.join(rootFolder, fileName)).toString();
+        let contents = fse.readFileSync(path.join(testRootFolder, fileName)).toString();
         return contents.indexOf(text) >= 0;
     }
 
@@ -52,7 +55,7 @@ suite("configure (Add Docker files to Workspace)", function (this: Suite): void 
 
     async function getProjectFiles(): Promise<string[]> {
         return await globAsync('**/*', {
-            cwd: rootFolder,
+            cwd: testRootFolder,
             dot: true, // include files beginning with dot
             nodir: true
         });
@@ -61,7 +64,8 @@ suite("configure (Add Docker files to Workspace)", function (this: Suite): void 
     function testInEmptyFolder(name: string, func: () => Promise<void>): void {
         test(name, async () => {
             // Delete everything in the root testing folder
-            await fse.emptyDir(rootFolder);
+            assert(path.basename(testRootFolder) === constants.testOutputName, "Trying to delete wrong folder");;
+            await fse.emptyDir(testRootFolder);
             await func();
         });
     }
@@ -80,13 +84,13 @@ suite("configure (Add Docker files to Workspace)", function (this: Suite): void 
 
             assertFileContains('docker-compose.debug.yml', '1234:1234');
             assertFileContains('docker-compose.debug.yml', '9229:9229');
-            assertFileContains('docker-compose.debug.yml', 'image: .testoutput');
+            assertFileContains('docker-compose.debug.yml', 'image: testoutput');
             assertFileContains('docker-compose.debug.yml', 'NODE_ENV: development');
             assertFileContains('docker-compose.debug.yml', 'command: node --inspect index.js');
 
             assertFileContains('docker-compose.yml', '1234:1234');
             assertNotFileContains('docker-compose.yml', '9229:9229');
-            assertFileContains('docker-compose.yml', 'image: .testoutput');
+            assertFileContains('docker-compose.yml', 'image: testoutput');
             assertFileContains('docker-compose.yml', 'NODE_ENV: production');
             assertNotFileContains('docker-compose.yml', 'command: node --inspect index.js');
 
@@ -121,13 +125,13 @@ suite("configure (Add Docker files to Workspace)", function (this: Suite): void 
 
             assertFileContains('docker-compose.debug.yml', '4321:4321');
             assertFileContains('docker-compose.debug.yml', '9229:9229');
-            assertFileContains('docker-compose.debug.yml', 'image: .testoutput');
+            assertFileContains('docker-compose.debug.yml', 'image: testoutput');
             assertFileContains('docker-compose.debug.yml', 'NODE_ENV: development');
             assertFileContains('docker-compose.debug.yml', 'command: node --inspect index.js');
 
             assertFileContains('docker-compose.yml', '4321:4321');
             assertNotFileContains('docker-compose.yml', '9229:9229');
-            assertFileContains('docker-compose.yml', 'image: .testoutput');
+            assertFileContains('docker-compose.yml', 'image: testoutput');
             assertFileContains('docker-compose.yml', 'NODE_ENV: production');
             assertNotFileContains('docker-compose.yml', 'command: node --inspect index.js');
 
@@ -304,8 +308,8 @@ suite("configure (Add Docker files to Workspace)", function (this: Suite): void 
 
             assertFileContains('Dockerfile', 'EXPOSE 3000');
             assertFileContains('DockerFile', 'ARG JAVA_OPTS');
-            assertFileContains('Dockerfile', 'ADD .testoutput.jar .testoutput.jar');
-            assertFileContains('Dockerfile', 'ENTRYPOINT exec java $JAVA_OPTS -jar .testoutput.jar');
+            assertFileContains('Dockerfile', 'ADD testoutput.jar testoutput.jar');
+            assertFileContains('Dockerfile', 'ENTRYPOINT exec java $JAVA_OPTS -jar testoutput.jar');
         });
 
         testInEmptyFolder("Pom file", async () => {
@@ -333,8 +337,8 @@ suite("configure (Add Docker files to Workspace)", function (this: Suite): void 
 
             assertFileContains('Dockerfile', 'EXPOSE 3000');
             assertFileContains('DockerFile', 'ARG JAVA_OPTS');
-            assertFileContains('Dockerfile', 'ADD target/app-artifact-id-1.0-SNAPSHOT.jar .testoutput.jar');
-            assertFileContains('Dockerfile', 'ENTRYPOINT exec java $JAVA_OPTS -jar .testoutput.jar');
+            assertFileContains('Dockerfile', 'ADD target/app-artifact-id-1.0-SNAPSHOT.jar testoutput.jar');
+            assertFileContains('Dockerfile', 'ENTRYPOINT exec java $JAVA_OPTS -jar testoutput.jar');
         });
 
         testInEmptyFolder("Empty gradle file - defaults", async () => {
@@ -348,8 +352,8 @@ suite("configure (Add Docker files to Workspace)", function (this: Suite): void 
 
             assertFileContains('Dockerfile', 'EXPOSE 3000');
             assertFileContains('DockerFile', 'ARG JAVA_OPTS');
-            assertFileContains('Dockerfile', 'ADD build/libs/.testoutput-0.0.1.jar .testoutput.jar');
-            assertFileContains('Dockerfile', 'ENTRYPOINT exec java $JAVA_OPTS -jar .testoutput.jar');
+            assertFileContains('Dockerfile', 'ADD build/libs/testOutput-0.0.1.jar testoutput.jar');
+            assertFileContains('Dockerfile', 'ENTRYPOINT exec java $JAVA_OPTS -jar testoutput.jar');
         });
 
         testInEmptyFolder("Gradle with jar", async () => {
@@ -430,8 +434,8 @@ suite("configure (Add Docker files to Workspace)", function (this: Suite): void 
 
             assertFileContains('Dockerfile', 'EXPOSE 3000');
             assertFileContains('DockerFile', 'ARG JAVA_OPTS');
-            assertFileContains('Dockerfile', 'ADD build/libs/.testoutput-1.2.3.jar .testoutput.jar');
-            assertFileContains('Dockerfile', 'ENTRYPOINT exec java $JAVA_OPTS -jar .testoutput.jar');
+            assertFileContains('Dockerfile', 'ADD build/libs/testOutput-1.2.3.jar testoutput.jar');
+            assertFileContains('Dockerfile', 'ENTRYPOINT exec java $JAVA_OPTS -jar testoutput.jar');
         });
 
     });

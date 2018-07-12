@@ -57,7 +57,7 @@ gulp.task('upload-vsix', (callback) => {
 gulp.task('pretest', (callback) => {
     // We need a folder to open vscode against while running tests.  Any additional temporary folders needed will be created within this folder (and hence workspace)
     let rootFolder = process.cwd();
-    let testOutput = path.join(rootFolder, ".testoutput");
+    let testOutput = path.join(rootFolder, "testOutput");
     if (!fs.existsSync(testOutput)) {
         fs.mkdirSync(testOutput);
     }
