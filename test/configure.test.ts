@@ -292,8 +292,23 @@ suite("configure (Add Docker files to Workspace)", function (this: Suite): void 
         //     );
         // });
 
+        testInEmptyFolder("Empty pom file", async () => {
+            await writeFile('', 'pom.xml', `
+                <?xml version = "1.0" encoding = "UTF-8"?>
+                `);
+
+            await testConfigureDocker('Java', undefined /*port*/);
+
+            let projectFiles = await getProjectFiles();
+            assertEx.unorderedArraysEqual(projectFiles, ['pom.xml', 'Dockerfile', 'docker-compose.debug.yml', 'docker-compose.yml', '.dockerignore'], "The set of files in the project folder after configure was run is not correct.");
+
+            assertFileContains('Dockerfile', 'EXPOSE 3000');
+            assertFileContains('DockerFile', 'ARG JAVA_OPTS');
+            assertFileContains('Dockerfile', 'ADD .testoutput.jar .testoutput.jar');
+            assertFileContains('Dockerfile', 'ENTRYPOINT exec java $JAVA_OPTS -jar .testoutput.jar');
+        });
+
         testInEmptyFolder("Pom file", async () => {
-            // https://github.com/dotnet/dotnet-docker/tree/master/samples/aspnetapp
             await writeFile('', 'pom.xml', `
                 <?xml version = "1.0" encoding = "UTF-8"?>
                     <project xmlns="http://maven.apache.org/POM/4.0.0"
@@ -303,7 +318,7 @@ suite("configure (Add Docker files to Workspace)", function (this: Suite): void 
 
                     <groupId>com.microsoft.azure</groupId>
                     <artifactId>app-artifact-id</artifactId>
-                    <version>1.0-BETA</version>
+                    <version>1.0-SNAPSHOT</version>
                     <packaging>jar</packaging>
 
                     <name>app-on-azure</name>
@@ -318,7 +333,104 @@ suite("configure (Add Docker files to Workspace)", function (this: Suite): void 
 
             assertFileContains('Dockerfile', 'EXPOSE 3000');
             assertFileContains('DockerFile', 'ARG JAVA_OPTS');
-            assertFileContains('Dockerfile', 'ADD target/app-artifact-id-1.0-BETA.jar .testoutput.jar');
+            assertFileContains('Dockerfile', 'ADD target/app-artifact-id-1.0-SNAPSHOT.jar .testoutput.jar');
+            assertFileContains('Dockerfile', 'ENTRYPOINT exec java $JAVA_OPTS -jar .testoutput.jar');
+        });
+
+        testInEmptyFolder("Empty gradle file - defaults", async () => {
+            // https://github.com/dotnet/dotnet-docker/tree/master/samples/aspnetapp
+            await writeFile('', 'build.gradle', ``);
+
+            await testConfigureDocker('Java', undefined /*port*/);
+
+            let projectFiles = await getProjectFiles();
+            assertEx.unorderedArraysEqual(projectFiles, ['build.gradle', 'Dockerfile', 'docker-compose.debug.yml', 'docker-compose.yml', '.dockerignore'], "The set of files in the project folder after configure was run is not correct.");
+
+            assertFileContains('Dockerfile', 'EXPOSE 3000');
+            assertFileContains('DockerFile', 'ARG JAVA_OPTS');
+            assertFileContains('Dockerfile', 'ADD build/libs/.testoutput-0.0.1.jar .testoutput.jar');
+            assertFileContains('Dockerfile', 'ENTRYPOINT exec java $JAVA_OPTS -jar .testoutput.jar');
+        });
+
+        testInEmptyFolder("Gradle with jar", async () => {
+            // https://github.com/dotnet/dotnet-docker/tree/master/samples/aspnetapp
+            await writeFile('', 'build.gradle', `
+                apply plugin: 'groovy'
+
+                dependencies {
+                    compile gradleApi()
+                    compile localGroovy()
+                }
+
+                apply plugin: 'maven'
+                apply plugin: 'signing'
+
+                repositories {
+                    mavenCentral()
+                }
+
+                group = 'com.github.test'
+                version = '1.2.3'
+                sourceCompatibility = 1.7
+                targetCompatibility = 1.7
+
+                task javadocJar(type: Jar) {
+                    classifier = 'javadoc'
+                    from javadoc
+                }
+
+                task sourcesJar(type: Jar) {
+                    classifier = 'sources'
+                    from sourceSets.main.allSource
+                }
+
+                artifacts {
+                    archives javadocJar, sourcesJar
+                }
+
+                jar {
+                    configurations.shade.each { dep ->
+                        from(project.zipTree(dep)){
+                            duplicatesStrategy 'warn'
+                        }
+                    }
+
+                    manifest {
+                        attributes 'version':project.version
+                        attributes 'javaCompliance': project.targetCompatibility
+                        attributes 'group':project.group
+                        attributes 'Implementation-Version': project.version + getGitHash()
+                    }
+                    archiveName 'abc.jar'
+                }
+
+                uploadArchives {
+                    repositories {
+                        mavenDeployer {
+
+                            beforeDeployment { MavenDeployment deployment -> signing.signPom(deployment) }
+
+                            repository(url: uri('../repo'))
+
+                            pom.project {
+                                name 'test'
+                                packaging 'jar'
+                                description 'test'
+                                url 'https://github.com/test'
+                            }
+                        }
+                    }
+                }
+                            `);
+
+            await testConfigureDocker('Java', undefined /*port*/);
+
+            let projectFiles = await getProjectFiles();
+            assertEx.unorderedArraysEqual(projectFiles, ['build.gradle', 'Dockerfile', 'docker-compose.debug.yml', 'docker-compose.yml', '.dockerignore'], "The set of files in the project folder after configure was run is not correct.");
+
+            assertFileContains('Dockerfile', 'EXPOSE 3000');
+            assertFileContains('DockerFile', 'ARG JAVA_OPTS');
+            assertFileContains('Dockerfile', 'ADD build/libs/.testoutput-1.2.3.jar .testoutput.jar');
             assertFileContains('Dockerfile', 'ENTRYPOINT exec java $JAVA_OPTS -jar .testoutput.jar');
         });
 

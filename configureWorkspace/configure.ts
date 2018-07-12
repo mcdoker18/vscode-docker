@@ -451,7 +451,7 @@ async function readPomOrGradle(folderPath: string): Promise<PackageJson> {
     var pkg: PackageJson = getDefaultPackageJson(); //default
 
     if (fs.existsSync(path.join(folderPath, 'pom.xml'))) {
-        const json = await new Promise<any>((resolve, reject) => {
+        let json = await new Promise<any>((resolve, reject) => {
             pomParser.parse({
                 filePath: path.join(folderPath, 'pom.xml')
             }, (error, response) => {
@@ -462,12 +462,13 @@ async function readPomOrGradle(folderPath: string): Promise<PackageJson> {
                 resolve(response.pomObject);
             });
         });
+        json = json || {};
 
-        if (json.project.version) {
+        if (json.project && json.project.version) {
             pkg.version = json.project.version;
         }
 
-        if (json.project.artifactid) {
+        if (json.project && json.project.artifactid) {
             pkg.artifactName = `target/${json.project.artifactid}-${pkg.version}.jar`;
         }
     } else if (fs.existsSync(path.join(folderPath, 'build.gradle'))) {
@@ -482,7 +483,7 @@ async function readPomOrGradle(folderPath: string): Promise<PackageJson> {
         if (json.jar && json.jar.archiveName) {
             pkg.artifactName = `build/libs/${json.jar.archiveName}`;
         } else {
-            const baseName = json.jar && json.jar.baseName ? json.jar.baseName : json.archivesBaseName || path.dirname(folderPath); // asdf
+            const baseName = json.jar && json.jar.baseName ? json.jar.baseName : json.archivesBaseName || path.basename(folderPath);
             pkg.artifactName = `build/libs/${baseName}-${pkg.version}.jar`;
         }
     }

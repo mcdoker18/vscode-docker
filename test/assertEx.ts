@@ -17,31 +17,35 @@ export function isFalsey<T>(f: any, message?: string): void {
     assert.ok(!f, message);
 }
 
-function areUnorderedArraysEqual<T>(array1: T[], array2: T[]): boolean {
-    if (!(array1.length === array2.length)) {
-        return false;
+function areUnorderedArraysEqual<T>(actual: T[], expected: T[]): { areEqual: boolean, message?: string } {
+    actual = actual.slice();
+    expected = expected.slice();
+    actual.sort();
+    expected.sort();
+
+    let message = `Actual:   ${JSON.stringify(actual)}\nExpected: ${JSON.stringify(expected)}`
+
+    if (!(actual.length === expected.length)) {
+        return { areEqual: false, message };
     }
 
-    array1 = array1.slice();
-    array2 = array2.slice();
-    array1.sort();
-    array2.sort();
-
-    for (let i = 0; i < array1.length; ++i) {
-        if (array1[i] !== array2[i]) {
-            return false;
+    for (let i = 0; i < actual.length; ++i) {
+        if (actual[i] !== expected[i]) {
+            return { areEqual: false, message };
         }
     }
 
-    return true;
+    return { areEqual: true };
 }
 
 export function unorderedArraysEqual<T>(actual: T[], expected: T[], message?: string): void {
-    isTrue(areUnorderedArraysEqual(actual, expected), `${message}\n  Actual: ${JSON.stringify(actual)}\n  Expected: ${JSON.stringify(expected)}`);
+    let result = areUnorderedArraysEqual(actual, expected);
+    assert(result.areEqual, `${message}\n${result.message}`);
 }
 
-export function notUnorderedArraysEqual<T>(array1: T[], array2: T[], message?: string): void {
-    isFalse(areUnorderedArraysEqual(array1, array2), message);
+export function notUnorderedArraysEqual<T>(actual: T[], expected: T[], message?: string): void {
+    let result = areUnorderedArraysEqual(actual, expected);
+    assert(!result.areEqual, `${message}\n${result.message}`);
 }
 
 export async function throwsOrRejectsAsync(block: () => Promise<any>, expected: {}, message?: string): Promise<void> {
@@ -62,13 +66,13 @@ export async function throwsOrRejectsAsync(block: () => Promise<any>, expected: 
 
 suite("assertEx", () => {
     test("areUnorderedArraysEqual", () => {
-        isTrue(areUnorderedArraysEqual([], []));
-        isFalse(areUnorderedArraysEqual([], [1]));
-        isTrue(areUnorderedArraysEqual([1], [1]));
-        isFalse(areUnorderedArraysEqual([1], [1, 2]));
-        isTrue(areUnorderedArraysEqual([1, 2], [1, 2]));
-        isTrue(areUnorderedArraysEqual([1, 2], [2, 1]));
-        isFalse(areUnorderedArraysEqual([1, 2], [2, 1, 3]));
+        unorderedArraysEqual([], []);
+        notUnorderedArraysEqual([], [1]);
+        unorderedArraysEqual([1], [1]);
+        unorderedArraysEqual([1], [1, 2]);
+        unorderedArraysEqual([1, 2], [1, 2]);
+        unorderedArraysEqual([1, 2], [2, 1]);
+        notUnorderedArraysEqual([1, 2], [2, 1, 3]);
     });
 
     suite("throwsAsync", () => {
