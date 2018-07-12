@@ -40,7 +40,7 @@ function areUnorderedArraysEqual<T>(actual: T[], expected: T[]): { areEqual: boo
 
 export function unorderedArraysEqual<T>(actual: T[], expected: T[], message?: string): void {
     let result = areUnorderedArraysEqual(actual, expected);
-    assert(result.areEqual, `${message}\n${result.message}`);
+    assert(result.areEqual, `${message || "Unordered arrays are not equal"}\n${result.message}`);
 }
 
 export function notUnorderedArraysEqual<T>(actual: T[], expected: T[], message?: string): void {
